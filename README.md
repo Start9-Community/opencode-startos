@@ -36,9 +36,9 @@ network instead of a terminal on the same machine.
 ## Image and Container Runtime
 
 The package builds a thin image on top of the upstream OpenCode image
-(`ghcr.io/anomalyco/opencode`), pinned to a released tag in the package's
-`Dockerfile`. The upstream image is a slim Alpine base that ships neither `git`
-nor `bash`, and OpenCode shells out to `git` for repositories, diffs, and
+(`ghcr.io/anomalyco/opencode`), pinned in the package's `Dockerfile` by release
+tag and manifest-list digest. The upstream image is a slim Alpine base that ships
+neither `git` nor `bash`, and OpenCode shells out to `git` for repositories, diffs, and
 worktrees and to a shell for its terminal tool — so the package Dockerfile adds
 `git`, `bash`, and `openssh-client` (for `ssh` git remotes). Architectures are
 `x86_64` and `aarch64`, matching the architectures upstream publishes.
@@ -124,9 +124,8 @@ complete and nothing to configure on disk.
 3. The user opens the `ui` interface, signs in on the web page with the username
    `opencode` and that password.
 
-Model providers are not preconfigured; connecting one is part of using the app,
-not part of install. Nothing upstream is disabled or skipped, and the package
-adds no files OpenCode did not already expect.
+The package writes no OpenCode configuration, so provider and model setup is
+upstream's own, in the web app.
 
 ## Actions
 
@@ -144,8 +143,7 @@ status gating; what follows is what the metadata cannot express.
   every existing web session out when its password changes, so anyone already
   signed in must sign in again with the new password.
 - **Repeat safety.** Repeatable. Each run mints a fresh password and replaces the
-  previous one; it never accumulates. A `warning` is shown before it runs once a
-  password already exists.
+  previous one; it never accumulates.
 - **Outputs.** The username `opencode` (unmasked, copyable) and the new password
   (masked, copyable).
 
@@ -160,10 +158,8 @@ One task, raised by `startos/init/watchCredentials.ts`.
 Because it is `critical`, it blocks the service from starting and suspends the
 ordinary controls until it is satisfied — this is what the user sees first, and
 why nothing is reachable before a password exists. It is idempotent on its replay
-key, so ordinary rebuilds do not re-raise it. It returns only if the stored
-password is lost — most plausibly a restore that brought back `main` without the
-`startos` volume, in which case a new password must be set (and existing sessions
-are invalidated).
+key, so ordinary rebuilds do not re-raise it. It returns only if `store.json`
+loses the password, and running the action again clears it.
 
 ## Health Checks
 
@@ -207,13 +203,11 @@ required.
 2. **The `opencode pair` pairing-link flow is not wired up.** Sign in with the
    password from the **Set Admin Password** action instead of a one-time pairing
    link or QR code.
-3. **Model provider credentials are not preconfigured.** Connect a provider in
-   the web UI after install; the package ships no provider configuration.
-4. **OpenCode's self-updater is disabled** in the container. The server is updated
+3. **OpenCode's self-updater is disabled** in the container. The server is updated
    by updating the StartOS package, not from inside the app.
-5. **The container runs as `root`.** The upstream image does, and the package does
+4. **The container runs as `root`.** The upstream image does, and the package does
    not change its user.
-6. **The service opens its own outbound connections** — to model providers and to
+5. **The service opens its own outbound connections** — to model providers and to
    git repositories it clones or fetches. Those are made from the server's
    outbound route, independently of whichever address the web interface is
    published on.
