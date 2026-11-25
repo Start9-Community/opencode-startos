@@ -8,8 +8,6 @@ const { InputSpec, List, Value } = sdk
 
 const configSchema = 'https://opencode.ai/config.json'
 
-// The config file is read back as `unknown` for `providers` and `model` (see the
-// file model), so everything crossing that boundary is narrowed here.
 const asRecord = (value: unknown): Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -18,8 +16,11 @@ const asRecord = (value: unknown): Record<string, unknown> =>
 const asString = (value: unknown): string | undefined =>
   typeof value === 'string' && value !== '' ? value : undefined
 
-// `model` is `"provider/model"` in the file, but an object once OpenCode has
-// resolved it, so both spellings are read.
+// This action owns only the providers it wrote; every one carries this marker.
+const isManaged = (provider: Record<string, unknown>): boolean =>
+  asString(provider.package) === openAiCompatiblePackage
+
+// `model` is `"provider/model"` in the file, or the object OpenCode resolves it to.
 const defaultModelOf = (model: unknown): string | undefined => {
   const direct = asString(model)
   if (direct) return direct
@@ -65,8 +66,7 @@ const providerShape = InputSpec.of({
     default: null,
     patterns: [
       {
-        // The SDK anchors a pattern with `^…$` unless both are already present,
-        // so a leading-only `^` would demand the whole value be `http://`.
+        // The SDK anchors a pattern with `^…$` unless both are already present.
         regex: 'https?://.+',
         description: i18n('Must start with http:// or https://'),
       },
@@ -142,41 +142,36 @@ export const configureProviders = sdk.Action.withInput(
   // input spec
   inputSpec,
 
-  // prefill — the providers already configured, with their keys read back from
-  // the `startos` volume (the config file only holds a reference to each key)
+  // prefill: only the providers this action wrote, with their keys read back from
+  // the `startos` volume (the config holds a reference to each key, not the key).
   async ({ effects }) => {
     const config = await opencodeJson.read().once()
     const providerKeys = await storeJson.read((s) => s.providerKeys).once()
-    const defaultModel = defaultModelOf(config?.model)
-    const defaultProvider = defaultModel?.split('/')[0]
+    const defaultProvider = defaultModelOf(config?.model)?.split('/')[0]
 
     return {
-      providers: Object.entries(config?.providers ?? {}).map(([id, value]) => {
-        const provider = asRecord(value)
-        const settings = asRecord(provider.settings)
-        const models = asRecord(provider.models)
-        const key = providerKeys?.[id]
-
-        return {
-          id,
-          name: asString(provider.name) ?? id,
-          baseURL: asString(settings.baseURL) ?? '',
-          apiKey: asString(key) ?? null,
-          models: Object.keys(models),
-          isDefault: id === defaultProvider,
-        }
-      }),
+      providers: Object.entries(config?.providers ?? {})
+        .map(([id, value]) => [id, asRecord(value)] as const)
+        .filter(([, provider]) => isManaged(provider))
+        .map(([id, provider]) => {
+          const settings = asRecord(provider.settings)
+          return {
+            id,
+            name: asString(provider.name) ?? id,
+            baseURL: asString(settings.baseURL) ?? '',
+            apiKey: asString(providerKeys?.[id]) ?? null,
+            models: Object.keys(asRecord(provider.models)),
+            isDefault: id === defaultProvider,
+          }
+        }),
     }
   },
 
   // execution
   async ({ effects, input }) => {
-    // The keys go to the `startos` volume first: it triggers the restart that
-    // gives the server the new `OPENCODE_KEY_*` variables, and the config write
-    // that follows is picked up live by the running server either way.
-    //
-    // `update`, not `merge`: a merge would leave the key of a provider the user
-    // just removed in place, silently keeping it in the server's environment.
+    // The keys go to the `startos` volume first: it triggers the restart that gives
+    // the server the new `OPENCODE_KEY_*` variables. `update`, not `merge`, so a key
+    // of a provider the user just removed is not left behind in the environment.
     const providerKeys = Object.fromEntries(
       input.providers
         .filter((provider) => provider.apiKey)
@@ -188,34 +183,33 @@ export const configureProviders = sdk.Action.withInput(
     }))
 
     const marked = input.providers.find((provider) => provider.isDefault)
-    const model = marked ? `${marked.id}/${marked.models[0]}` : undefined
+    let shownModel: string | undefined
 
     await opencodeJson.update(effects, (current) => {
       const config = current ?? {}
       const existing = asRecord(config.providers)
-      const previousDefault = defaultModelOf(config.model)
-      // A default pointing at a provider this save drops would leave new
-      // sessions on a model nothing serves, so it is dropped with it. The check
-      // is against the form, not the file — the provider may be in the file and
-      // already removed from the form.
-      const keepsDefault =
-        previousDefault !== undefined &&
-        input.providers.some(
-          (provider) => provider.id === previousDefault.split('/')[0],
-        )
 
+      // Only the entries this action owns are rebuilt. Every other entry — one the
+      // user or OpenCode added — is copied through untouched.
       const providers: Record<string, unknown> = {}
+      const managedIds = new Set<string>()
+      for (const [id, value] of Object.entries(existing)) {
+        const provider = asRecord(value)
+        if (isManaged(provider)) managedIds.add(id)
+        else providers[id] = value
+      }
+
       for (const provider of input.providers) {
         const previous = asRecord(existing[provider.id])
         const settings = asRecord(previous.settings)
         const previousModels = asRecord(previous.models)
 
+        settings.baseURL = provider.baseURL
         if (provider.apiKey) {
           settings.apiKey = `{env:${providerKeyEnvVar(provider.id)}}`
         } else {
           delete settings.apiKey
         }
-        settings.baseURL = provider.baseURL
 
         const models: Record<string, unknown> = {}
         for (const modelId of provider.models) {
@@ -229,17 +223,36 @@ export const configureProviders = sdk.Action.withInput(
         providers[provider.id] = {
           ...previous,
           name: provider.name,
-          package: asString(previous.package) ?? openAiCompatiblePackage,
+          package: openAiCompatiblePackage,
           settings,
           models,
         }
+      }
+
+      // `model` is left as it was unless this save sets it, or it names a provider
+      // this save removes.
+      const previousDefault = defaultModelOf(config.model)
+      const previousProvider = previousDefault?.split('/')[0]
+      shownModel = previousDefault
+      let model: unknown = config.model
+      if (marked) {
+        const next = `${marked.id}/${marked.models[0]}`
+        model = next
+        shownModel = next
+      } else if (
+        previousProvider !== undefined &&
+        managedIds.has(previousProvider) &&
+        !input.providers.some((provider) => provider.id === previousProvider)
+      ) {
+        model = undefined
+        shownModel = undefined
       }
 
       return {
         ...config,
         $schema: configSchema,
         providers,
-        model: marked ? model : keepsDefault ? previousDefault : undefined,
+        model,
       }
     })
 
@@ -262,13 +275,13 @@ export const configureProviders = sdk.Action.withInput(
             qr: false,
             launchable: false,
           })),
-          ...(marked && model
+          ...(shownModel
             ? [
                 {
                   type: 'single' as const,
                   name: i18n('Default Model'),
                   description: null,
-                  value: model,
+                  value: shownModel,
                   masked: false,
                   copyable: true,
                   qr: false,

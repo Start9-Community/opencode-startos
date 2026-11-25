@@ -1,15 +1,9 @@
 import { FileHelper, z } from '@start9labs/start-sdk'
 import { sdk } from '../sdk'
 
-// OpenCode's global configuration, at the path OpenCode itself reads it on the
-// `main` volume (which is mounted at `/root`). The package models it so the
-// Configure Model Providers action can add providers without a shell.
-//
-// `providers` and `model` are deliberately left unvalidated beyond their
-// top-level type: `providers` is a map the action rebuilds, and `model` is
-// either `"provider/model"` or the object OpenCode resolves it to. Validating
-// their contents would let one hand-edited entry make `merge()` throw, which
-// fails the action rather than repairing the file.
+// OpenCode's global configuration. The Configure Model Providers action adds
+// providers here; `providers` and `model` stay unvalidated because the action owns
+// `providers`, and `model` is a string or the object OpenCode resolves it to.
 const shape = z.looseObject({
   $schema: z.string().optional().catch(undefined),
   model: z.unknown().optional().catch(undefined),

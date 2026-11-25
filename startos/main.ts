@@ -12,10 +12,8 @@ export const main = sdk.setupMain(async ({ effects }) => {
     throw new Error('The admin password has not been set')
   }
 
-  // Reactive: saving a provider with an API key changes this map, which rebuilds
-  // the daemon spec and restarts the server so it gains the `OPENCODE_KEY_*`
-  // variables the provider entries in OpenCode's own config refer to. Provider
-  // entries themselves need no restart — OpenCode reloads that file live.
+  // Reactive: a key change rebuilds the daemon and restarts the server so it gains
+  // the new `OPENCODE_KEY_*` variable. A provider entry alone needs no restart.
   const providerKeys =
     (await storeJson.read((s) => s.providerKeys).const(effects)) ?? {}
   const providerEnv = Object.fromEntries(

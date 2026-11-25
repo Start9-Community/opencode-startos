@@ -36,9 +36,9 @@ network instead of a terminal on the same machine.
 ## Image and Container Runtime
 
 The package builds a thin image on top of the upstream OpenCode image
-(`ghcr.io/anomalyco/opencode`), pinned to a released tag in the package's
-`Dockerfile`. The upstream image is a slim Alpine base that ships neither `git`
-nor `bash`, and OpenCode shells out to `git` for repositories, diffs, and
+(`ghcr.io/anomalyco/opencode`), pinned in the package's `Dockerfile` by release
+tag and manifest-list digest. The upstream image is a slim Alpine base that ships
+neither `git` nor `bash`, and OpenCode shells out to `git` for repositories, diffs, and
 worktrees and to a shell for its terminal tool — so the package Dockerfile adds
 `git`, `bash`, and `openssh-client` (for `ssh` git remotes). Architectures are
 `x86_64` and `aarch64`, matching the architectures upstream publishes.
@@ -131,10 +131,10 @@ complete and nothing to configure on disk.
 3. The user opens the `ui` interface, signs in on the web page with the username
    `opencode` and that password.
 
-Model providers are not preconfigured; connecting one happens after install,
-through the **Configure Model Providers** action rather than during it. Nothing
-upstream is disabled or skipped, and the package adds no files OpenCode did not
-already expect.
+Model providers are not preconfigured. Hosted providers connect in the web app
+itself, under **Settings → Providers**; the **Configure Model Providers** action
+adds an OpenAI-compatible endpoint the web app's own catalog has no entry for. The
+package adds no files OpenCode did not already expect of it.
 
 ## Actions
 
@@ -152,29 +152,32 @@ warning, and status gating; what follows is what the metadata cannot express.
   every existing web session out when its password changes, so anyone already
   signed in must sign in again with the new password.
 - **Repeat safety.** Repeatable. Each run mints a fresh password and replaces the
-  previous one; it never accumulates. A `warning` is shown before it runs once a
-  password already exists.
+  previous one; it never accumulates.
 - **Outputs.** The username `opencode` (unmasked, copyable) and the new password
   (masked, copyable).
 
 ### `configure-providers` — Configure Model Providers
 
-- **When to run it.** After install, and whenever the set of models OpenCode can
-  use changes. It is the only way to connect a model: the packaged OpenCode web
-  interface has no provider screen of its own.
+- **When to run it.** When OpenCode should use an OpenAI-compatible endpoint the
+  web app's own catalog has no entry for — a vLLM, LM Studio, or Ollama server on
+  your network. Hosted providers connect in the web app itself, under
+  **Settings → Providers**.
 - **What it changes.** For each provider in the form, an entry in the `providers`
   map of `main/.config/opencode/opencode.json`, and its API key under
-  `providerKeys` in `startos/store.json`. The `model` key is set to the provider
-  whose **Default** toggle is on, or dropped if that provider is removed. A new
-  or changed API key restarts the service, because the server receives it as an
-  `OPENCODE_KEY_<ID>` environment variable; a change that touches no key is
-  picked up by the running server without a restart.
+  `providerKeys` in `startos/store.json`. Only the entries this action wrote (the
+  ones carrying `package: @opencode/ai/providers/openai-compatible`) are rebuilt;
+  every other entry in the file, and a `model` that names none of them, is left as
+  it was. The `model` key is set when a provider's **Default** toggle is on, or
+  dropped when it names a provider this save removes. A new or changed API key
+  restarts the service, because the server receives it as an `OPENCODE_KEY_<ID>`
+  environment variable; a change that touches no key is picked up by the running
+  server without a restart.
 - **Cost.** Seconds. Nothing outside the two files above is touched, and no
   session, repository, or project is affected.
-- **Repeat safety.** The form is prefilled from the current configuration and is
-  the authority for it: what the form lists is what the file holds afterwards, so
-  saving it unchanged changes nothing and leaving a provider out disconnects it.
-  An empty form therefore disconnects every provider.
+- **Repeat safety.** The form is prefilled with the providers this action wrote and
+  is the authority for them: saving it unchanged changes nothing, leaving one out
+  disconnects it, and an empty form disconnects them all. Providers added elsewhere
+  — in the web app, or by hand — are not listed and are not touched.
 - **Outputs.** Each provider with the model IDs it serves, and the default model
   when one is set.
 
@@ -236,12 +239,11 @@ required.
 2. **The `opencode pair` pairing-link flow is not wired up.** Sign in with the
    password from the **Set Admin Password** action instead of a one-time pairing
    link or QR code.
-3. **Model providers are configured from StartOS, not from the app.** The
-   packaged OpenCode web interface has no provider screen, so providers are added
-   with the **Configure Model Providers** action. It covers OpenAI-compatible
-   endpoints — your own vLLM, LM Studio, or Ollama server, or a hosted API such
-   as OpenRouter. Provider families outside that shape are not configured by the
-   package.
+3. **The Configure Model Providers action covers OpenAI-compatible endpoints the
+   catalog cannot reach.** Hosted providers — OpenRouter, Anthropic, OpenAI, and
+   the rest — connect in the web app itself, under **Settings → Providers**. The
+   action adds an endpoint the catalog has no entry for, such as your own vLLM,
+   LM Studio, or Ollama server.
 4. **OpenCode's self-updater is disabled** in the container. The server is updated
    by updating the StartOS package, not from inside the app.
 5. **The container runs as `root`.** The upstream image does, and the package does
