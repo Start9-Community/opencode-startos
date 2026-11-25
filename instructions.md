@@ -25,14 +25,14 @@ StartOS server. You use it from a browser:
 1. On install, the service shows a task: **Set the admin password before signing
    in**. Run the **Set Admin Password** action and copy the password it returns.
    The username is always `opencode`.
-2. Open the **Web Interface** from the service's Interfaces tab (enable an
-   address there if none is enabled yet).
+2. Open the **Web Interface** from the service's Interfaces tab.
 3. On the **Connect to a server** screen, click **Use password**. The server
    address is already filled in — leave it as it is — paste the password, and
    click **Connect**.
-4. In the web app, open **Settings → Providers** and connect a model provider
-   (an API key, or your OpenCode Console account). OpenCode can't do anything
-   until it has a model to use.
+4. Choose a model. Out of the box OpenCode uses a free model hosted by
+   OpenCode, so your prompts and code are sent to OpenCode's servers. To use
+   your own provider instead, open **Settings → Providers** and connect it (an
+   API key, or your OpenCode Console account).
 5. Back on the home screen, click **Add project** and choose a folder to work in.
    Pick a folder inside your home directory (`~/…`, shown as `root` when you
    browse from `/`) — that is where your server keeps data across restarts.
