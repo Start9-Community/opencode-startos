@@ -39,8 +39,6 @@ export const main = sdk.setupMain(async ({ effects }) => {
   const pem = await providerCa.read().const(effects)
   const extraCaPath = pem ? providerCaPath : undefined
   if (pem) {
-    // The `.const()` read above re-runs this setup — and so restarts the daemon —
-    // whenever the certificate changes, so the mount can sit at a fixed path.
     mounts = mounts.mountVolume({
       volumeId: 'startos',
       subpath: providerCaDirectory,
