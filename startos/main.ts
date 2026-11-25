@@ -1,3 +1,9 @@
+import {
+  providerCa,
+  providerCaDirectory,
+  providerCaMountpoint,
+  providerCaPath,
+} from './fileModels/providerCa'
 import { storeJson } from './fileModels/store.json'
 import { i18n } from './i18n'
 import { sdk } from './sdk'
@@ -24,16 +30,30 @@ export const main = sdk.setupMain(async ({ effects }) => {
       .map(([id, key]) => [providerKeyEnvVar(id), key]),
   )
 
+  let mounts = sdk.Mounts.of().mountVolume({
+    volumeId: 'main',
+    subpath: null,
+    mountpoint: '/root',
+    readonly: false,
+  })
+  const pem = await providerCa.read().const(effects)
+  const extraCaPath = pem ? providerCaPath : undefined
+  if (pem) {
+    // The `.const()` read above re-runs this setup — and so restarts the daemon —
+    // whenever the certificate changes, so the mount can sit at a fixed path.
+    mounts = mounts.mountVolume({
+      volumeId: 'startos',
+      subpath: providerCaDirectory,
+      mountpoint: providerCaMountpoint,
+      readonly: true,
+    })
+  }
+
   return sdk.Daemons.of(effects).addDaemon('opencode', {
     subcontainer: sdk.SubContainer.of(
       effects,
       { imageId: 'opencode' },
-      sdk.Mounts.of().mountVolume({
-        volumeId: 'main',
-        subpath: null,
-        mountpoint: '/root',
-        readonly: false,
-      }),
+      mounts,
       'opencode-sub',
     ),
     exec: {
@@ -47,6 +67,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
       env: {
         OPENCODE_PASSWORD: adminPassword,
         OPENCODE_DISABLE_AUTOUPDATE: '1',
+        ...(extraCaPath && { NODE_EXTRA_CA_CERTS: extraCaPath }),
         ...providerEnv,
       },
     },

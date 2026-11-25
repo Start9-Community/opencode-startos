@@ -187,6 +187,9 @@ export const configureProviders = sdk.Action.withInput(
 
   // execution
   async ({ effects, input }) => {
+    if (input.providers.filter((provider) => provider.isDefault).length > 1) {
+      throw new Error(i18n('Select only one default provider.'))
+    }
     const providerKeys = Object.fromEntries(
       input.providers
         .filter((provider) => provider.apiKey && !isReference(provider.apiKey))
@@ -237,10 +240,11 @@ export const configureProviders = sdk.Action.withInput(
 
         const models: Record<string, unknown> = {}
         for (const modelId of provider.models) {
+          const existingModel = asRecord(previousModels[modelId])
           models[modelId] = {
-            ...asRecord(previousModels[modelId]),
-            name: modelId,
-            modelID: modelId,
+            ...existingModel,
+            name: asString(existingModel.name) ?? modelId,
+            modelID: asString(existingModel.modelID) ?? modelId,
           }
         }
 

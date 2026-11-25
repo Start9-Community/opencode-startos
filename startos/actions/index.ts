@@ -1,3 +1,4 @@
+import { configureProviderCa } from './configureProviderCa'
 import { sdk } from '../sdk'
 import { configureProviders } from './configureProviders'
 import { setAdminPassword } from './setAdminPassword'
@@ -5,3 +6,4 @@ import { setAdminPassword } from './setAdminPassword'
 export const actions = sdk.Actions.of()
   .addAction(setAdminPassword)
   .addAction(configureProviders)
+  .addAction(configureProviderCa)

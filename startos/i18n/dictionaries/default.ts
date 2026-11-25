@@ -46,6 +46,14 @@ const dict = {
   'Default Model': 33,
   'Provider ID "${id}" belongs to a provider configured outside this action. Choose another ID.': 34,
   'The OpenCode configuration contains invalid JSONC. Fix opencode.json before configuring providers.': 35,
+  'Configure Provider CA': 36,
+  'Trust one additional CA for outbound OpenCode HTTPS connections.': 37,
+  'Public CA certificate (PEM)': 38,
+  'Paste one certificate. Clear the field to remove trust.': 39,
+  'Trust settings saved.': 40,
+  'Select only one default provider.': 41,
+  'Paste one public PEM CA certificate.': 42,
+  'This certificate is not a CA.': 43,
 } as const
 
 /**
