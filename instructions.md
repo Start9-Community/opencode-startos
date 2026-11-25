@@ -83,9 +83,9 @@ Run the action again to change an endpoint or add another provider, and delete a
 provider by removing its entry from the list. The API key of a provider you have
 already configured is filled in when the form opens, so leave it as it is unless
 you are replacing it. OpenAI-compatible endpoints you configured by hand are
-also listed, with any literal API key filled in. Providers connected in the web
-app are not affected. If an ID is already in use outside this list, choose a
-different ID.
+also listed, with their API key — or the `{env:…}` or `{file:…}` reference that
+supplies it — filled in. Providers connected in the web app are not affected. If
+an ID is already in use outside this list, choose a different ID.
 
 ### Changing the password
 

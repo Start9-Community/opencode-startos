@@ -30,6 +30,12 @@ const defaultModelOf = (model: unknown): string | undefined => {
   return provider && id ? `${provider}/${id}` : undefined
 }
 
+const keyReference = (providerId: string) =>
+  `{env:${providerKeyEnvVar(providerId)}}`
+
+// `{env:…}` and `{file:…}` keys, which OpenCode resolves itself.
+const isReference = (apiKey: string) => /^\{(?:env|file):[^}]+\}$/.test(apiKey)
+
 const providerShape = InputSpec.of({
   id: Value.text({
     name: i18n('ID'),
@@ -142,12 +148,14 @@ export const configureProviders = sdk.Action.withInput(
   // input spec
   inputSpec,
 
-  // prefill: the OpenAI-compatible entries; each key comes from a literal in the
-  // entry, or from the `startos` volume the action stored it in.
+  // prefill: the OpenAI-compatible entries; the action's own key references
+  // resolve from the `startos` volume.
   async ({ effects }) => {
     const config = await opencodeJson.read().once()
     const providerKeys = await storeJson.read((s) => s.providerKeys).once()
-    const defaultProvider = defaultModelOf(config?.model)?.split('/')[0]
+    const defaultModel = defaultModelOf(config?.model) ?? ''
+    const [defaultProvider] = defaultModel.split('/')
+    const defaultId = defaultModel.slice(defaultProvider.length + 1)
 
     return {
       providers: Object.entries(config?.providers ?? {})
@@ -156,16 +164,22 @@ export const configureProviders = sdk.Action.withInput(
         .map(([id, provider]) => {
           const settings = asRecord(provider.settings)
           const configuredKey = asString(settings.apiKey)
+          const listed = Object.keys(asRecord(provider.models))
+          const isDefault = id === defaultProvider
+          const models =
+            isDefault && listed.includes(defaultId)
+              ? [defaultId, ...listed.filter((model) => model !== defaultId)]
+              : listed
           return {
             id,
             name: asString(provider.name) ?? id,
             baseURL: asString(settings.baseURL) ?? '',
             apiKey:
-              configuredKey && !/\{(?:env|file):/.test(configuredKey)
+              configuredKey && configuredKey !== keyReference(id)
                 ? configuredKey
                 : (asString(providerKeys?.[id]) ?? null),
-            models: Object.keys(asRecord(provider.models)),
-            isDefault: id === defaultProvider,
+            models,
+            isDefault,
           }
         }),
     }
@@ -175,7 +189,7 @@ export const configureProviders = sdk.Action.withInput(
   async ({ effects, input }) => {
     const providerKeys = Object.fromEntries(
       input.providers
-        .filter((provider) => provider.apiKey)
+        .filter((provider) => provider.apiKey && !isReference(provider.apiKey))
         .map((provider) => [provider.id, provider.apiKey]),
     )
     const marked = input.providers.find((provider) => provider.isDefault)
@@ -214,7 +228,9 @@ export const configureProviders = sdk.Action.withInput(
 
         settings.baseURL = provider.baseURL
         if (provider.apiKey) {
-          settings.apiKey = `{env:${providerKeyEnvVar(provider.id)}}`
+          settings.apiKey = isReference(provider.apiKey)
+            ? provider.apiKey
+            : keyReference(provider.id)
         } else {
           delete settings.apiKey
         }
@@ -237,24 +253,18 @@ export const configureProviders = sdk.Action.withInput(
         }
       }
 
-      // `model` is left as it was unless this save sets it, or it names a provider
-      // this save removes.
-      const previousDefault = defaultModelOf(config.model)
-      const previousProvider = previousDefault?.split('/')[0]
-      shownModel = previousDefault
+      // A `model` naming none of the managed providers is left as found.
+      const previousProvider = defaultModelOf(config.model)?.split('/')[0]
       let model: unknown = config.model
       if (marked) {
-        const next = `${marked.id}/${marked.models[0]}`
-        model = next
-        shownModel = next
+        model = `${marked.id}/${marked.models[0]}`
       } else if (
         previousProvider !== undefined &&
-        managedIds.has(previousProvider) &&
-        !input.providers.some((provider) => provider.id === previousProvider)
+        managedIds.has(previousProvider)
       ) {
         model = undefined
-        shownModel = undefined
       }
+      shownModel = defaultModelOf(model)
 
       await storeJson.update(effects, (current) => ({
         ...current,

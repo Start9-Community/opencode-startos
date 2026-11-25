@@ -166,22 +166,25 @@ warning, and status gating; what follows is what the metadata cannot express.
   **Settings → Providers**.
 - **What it changes.** For each provider in the form, an entry in the `providers`
   map of `main/.config/opencode/opencode.json`, and its API key under
-  `providerKeys` in `startos/store.json`. Entries carrying
+  `providerKeys` in `startos/store.json`; a key given as an `{env:…}` or
+  `{file:…}` reference stays in the entry as written instead. Entries carrying
   `package: @opencode/ai/providers/openai-compatible` are rebuilt; an ID collision
   with any other entry is rejected before either file changes. Every other entry,
   and a `model` that names none of the managed entries, is left as it was. The
-  `model` key is set when a provider's **Default** toggle is on, or dropped when it
-  names a provider this save removes. A new or changed API key
-  restarts the service, because the server receives it as an `OPENCODE_KEY_<ID>`
+  `model` key is set when a provider's **Default** toggle is on; with none on, a
+  `model` naming a managed entry is dropped. A new or changed API key restarts
+  the service, because the server receives it as an `OPENCODE_KEY_<ID>`
   environment variable; a change that touches no key is picked up by the running
   server without a restart.
 - **Cost.** Seconds. Nothing outside the two files above is touched, and no
   session, repository, or project is affected.
 - **Repeat safety.** The form is prefilled with the OpenAI-compatible entries and
   is the authority for them: leaving one out disconnects it, and an empty form
-  disconnects them all. A literal API key on an existing entry is prefilled and
-  moved into `providerKeys` on save. Providers using another package are not
-  listed and are not touched.
+  disconnects them all. The provider holding the default model opens with
+  **Default** on and that model listed first, so saving unchanged keeps the
+  default. An existing entry's literal API key or key reference is prefilled; on
+  save the literal moves into `providerKeys` and the reference is kept as
+  written. Providers using another package are not listed and are not touched.
 - **Outputs.** Each provider with the model IDs it serves, and the default model
   when one is set.
 
