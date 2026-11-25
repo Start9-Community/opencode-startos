@@ -85,7 +85,17 @@ already configured is filled in when the form opens, so leave it as it is unless
 you are replacing it. OpenAI-compatible endpoints you configured by hand are
 also listed, with their API key — or the `{env:…}` or `{file:…}` reference that
 supplies it — filled in. Providers connected in the web app are not affected. If
-an ID is already in use outside this list, choose a different ID.
+an ID is already in use outside this list, choose a different ID. Existing model
+aliases keep their upstream IDs when you save again, and turning off every
+**Default** toggle leaves no default model.
+
+### Private HTTPS providers
+
+Open **Configure Provider CA** and paste the public PEM certificate of the CA
+that signed the provider endpoint. Saving a new CA restarts OpenCode. Reopen
+the action to replace it, or clear the field to remove trust. The CA applies to
+outbound OpenCode TLS connections and is included in the service backup.
+Use the hostname or IP listed in the server certificate.
 
 ### Changing the password
 

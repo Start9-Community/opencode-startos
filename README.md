@@ -52,10 +52,10 @@ One subcontainer, `opencode-sub`, runs the server. The image's entrypoint is the
 
 The package declares two volumes.
 
-| Volume    | Mount point          | Contents                                                                                                                 |
-| --------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `main`    | `/root` (read-write) | The container's entire home: sessions, credentials, repositories, projects, and OpenCode's own config, state, and cache. |
-| `startos` | not mounted          | StartOS-side state: `store.json`, holding the generated login password and the configured providers' API keys.           |
+| Volume    | Mount point                                  | Contents                                                                                                                 |
+| --------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `main`    | `/root` (read-write)                         | The container's entire home: sessions, credentials, repositories, projects, and OpenCode's own config, state, and cache. |
+| `startos` | optional read-only `provider-trust/` subtree | StartOS-side state: `store.json`, holding the generated login password and the configured providers' API keys.           |
 
 `main` is mounted over the image's home directory, so everything OpenCode writes
 under `/root` persists across restarts and updates:
@@ -67,27 +67,28 @@ under `/root` persists across restarts and updates:
 `/tmp/opencode` (OpenCode's temporary directory) is **not** on a volume and is
 lost on restart; treat anything only in there as scratch.
 
-The `startos` volume is deliberately not mounted into `opencode-sub`, so the
-running server never sees the file itself — it receives the login password as
+Only the optional public CA directory is mounted from `startos`. The running
+server cannot read `store.json` — it receives the login password as
 `OPENCODE_PASSWORD` and each configured provider's API key as an
 `OPENCODE_KEY_<ID>` variable instead.
 
 ## File Models
 
-The package owns two file models.
+The package owns three file models.
 
 | File                                  | Format | Keys                            | Seeded by                                | Rewritten by                 |
 | ------------------------------------- | ------ | ------------------------------- | ---------------------------------------- | ---------------------------- |
 | `startos/store.json`                  | JSON   | `adminPassword`, `providerKeys` | the **Set Admin Password** action        | the two actions, on each run |
 | `main/.config/opencode/opencode.json` | JSONC  | `$schema`, `providers`, `model` | the **Configure Model Providers** action | the same action, on each run |
+| `startos/provider-trust/ca.pem`       | PEM    | —                               | the **Configure Provider CA** action     | the same action, on each run |
 
 `adminPassword` is stored in clear text because the server reads it verbatim
 from `OPENCODE_PASSWORD` and cannot be given a hash. There is no default: it is
 absent until the user runs the action, which is what the [task](#tasks) waits
 for. `providerKeys` maps a configured provider's id to its API key, and has no
-default either.
+default either. The PEM file is optional and holds one public CA certificate.
 
-Both schemas are permissive (`z.looseObject`, every key optional), and the
+Both JSON schemas are permissive (`z.looseObject`, every key optional), and the
 package writes each file only from an action — never at startup, and never to
 normalize or repair it. A hand edit therefore survives:
 
@@ -187,6 +188,24 @@ warning, and status gating; what follows is what the metadata cannot express.
   written. Providers using another package are not listed and are not touched.
 - **Outputs.** Each provider with the model IDs it serves, and the default model
   when one is set.
+
+### `configure-provider-ca` — Configure Provider CA
+
+- **When to run it.** When an OpenAI-compatible endpoint you use serves a
+  certificate signed by a private or self-signed CA — a vLLM or Ollama server
+  behind an internal certificate authority, for instance — and the web app cannot
+  reach it. Paste the **public** CA certificate only; never a private key.
+- **What it changes.** `startos/provider-trust/ca.pem`, one public CA certificate.
+  The directory is mounted read-only into the container and the certificate is
+  handed to OpenCode as `NODE_EXTRA_CA_CERTS` on startup, so it applies to
+  outbound TLS connections. The file lives on a volume and is included in the
+  service backup.
+- **Cost.** Seconds, and the service restarts so OpenCode re-reads the CA. Nothing
+  else is touched, and no session, repository, or project is affected.
+- **Repeat safety.** Repeatable. Running it again replaces the stored certificate;
+  clearing the field removes trust. The form opens prefilled with the current
+  certificate, so saving unchanged keeps it. One CA at a time.
+- **Outputs.** None.
 
 ## Tasks
 

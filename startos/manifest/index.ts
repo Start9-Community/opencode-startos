@@ -10,7 +10,8 @@ export const manifest = setupManifest({
   marketingUrl: 'https://opencode.ai',
   donationUrl: null,
   description: { short, long },
-  // `startos` holds the login password and is never mounted into the container.
+  // `startos` holds secrets (the login password and provider API keys) and the
+  // optional public CA; only the CA subtree is mounted into the container, read-only.
   volumes: ['main', 'startos'],
   images: {
     opencode: {
