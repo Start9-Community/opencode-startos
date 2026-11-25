@@ -82,8 +82,10 @@ if the picker still looks empty.
 Run the action again to change an endpoint or add another provider, and delete a
 provider by removing its entry from the list. The API key of a provider you have
 already configured is filled in when the form opens, so leave it as it is unless
-you are replacing it. Only the providers you added this way are listed, so a
-provider you connected in the web app is not affected by this action.
+you are replacing it. OpenAI-compatible endpoints you configured by hand are
+also listed, with any literal API key filled in. Providers connected in the web
+app are not affected. If an ID is already in use outside this list, choose a
+different ID.
 
 ### Changing the password
 
@@ -104,10 +106,6 @@ login password back as they were.
   password from the **Set Admin Password** action instead.
 - **The server does not update itself.** OpenCode's in-app update check is turned
   off; update the service by updating this package in StartOS.
-- **The Configure Model Providers action covers OpenAI-compatible endpoints only.**
-  Hosted providers connect in the web app, under **Settings → Providers**; the
-  action is for an endpoint the catalog cannot reach, such as your own vLLM,
-  LM Studio, or Ollama server.
 
 ### If you publish the interface through a tunnel
 

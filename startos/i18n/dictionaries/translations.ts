@@ -36,6 +36,8 @@ export default {
     31: 'Proveedores de modelos',
     32: 'Guardado. Estos proveedores están disponibles en OpenCode, y las sesiones nuevas empiezan con el modelo predeterminado si hay uno definido.',
     33: 'Modelo predeterminado',
+    34: 'El ID de proveedor "${id}" pertenece a un proveedor configurado fuera de esta acción. Elige otro ID.',
+    35: 'La configuración de OpenCode contiene JSONC no válido. Corrige opencode.json antes de configurar los proveedores.',
   },
   de_DE: {
     0: 'Weboberfläche',
@@ -72,6 +74,8 @@ export default {
     31: 'Modellanbieter',
     32: 'Gespeichert. Diese Anbieter stehen in OpenCode zur Verfügung, und neue Sitzungen starten mit dem Standardmodell, sofern eines festgelegt ist.',
     33: 'Standardmodell',
+    34: 'Die Anbieter-ID „${id}“ gehört zu einem außerhalb dieser Aktion konfigurierten Anbieter. Wählen Sie eine andere ID.',
+    35: 'Die OpenCode-Konfiguration enthält ungültiges JSONC. Korrigieren Sie opencode.json, bevor Sie Anbieter konfigurieren.',
   },
   pl_PL: {
     0: 'Interfejs webowy',
@@ -108,6 +112,8 @@ export default {
     31: 'Dostawcy modeli',
     32: 'Zapisano. Ci dostawcy są dostępni w OpenCode, a nowe sesje zaczynają od modelu domyślnego, jeśli został ustawiony.',
     33: 'Model domyślny',
+    34: 'Identyfikator dostawcy „${id}” należy do dostawcy skonfigurowanego poza tą akcją. Wybierz inny identyfikator.',
+    35: 'Konfiguracja OpenCode zawiera nieprawidłowy JSONC. Popraw opencode.json przed skonfigurowaniem dostawców.',
   },
   fr_FR: {
     0: 'Interface web',
@@ -144,5 +150,7 @@ export default {
     31: 'Fournisseurs de modèles',
     32: "Enregistré. Ces fournisseurs sont disponibles dans OpenCode, et les nouvelles sessions démarrent sur le modèle par défaut s'il est défini.",
     33: 'Modèle par défaut',
+    34: 'L’identifiant de fournisseur « ${id} » appartient à un fournisseur configuré en dehors de cette action. Choisissez un autre identifiant.',
+    35: 'La configuration OpenCode contient du JSONC invalide. Corrigez opencode.json avant de configurer les fournisseurs.',
   },
 } satisfies Record<string, LangDict>

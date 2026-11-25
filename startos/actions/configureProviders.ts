@@ -16,7 +16,7 @@ const asRecord = (value: unknown): Record<string, unknown> =>
 const asString = (value: unknown): string | undefined =>
   typeof value === 'string' && value !== '' ? value : undefined
 
-// This action owns only the providers it wrote; every one carries this marker.
+// Other provider packages remain untouched, including when form IDs collide.
 const isManaged = (provider: Record<string, unknown>): boolean =>
   asString(provider.package) === openAiCompatiblePackage
 
@@ -142,8 +142,8 @@ export const configureProviders = sdk.Action.withInput(
   // input spec
   inputSpec,
 
-  // prefill: only the providers this action wrote, with their keys read back from
-  // the `startos` volume (the config holds a reference to each key, not the key).
+  // prefill: the OpenAI-compatible entries; each key comes from a literal in the
+  // entry, or from the `startos` volume the action stored it in.
   async ({ effects }) => {
     const config = await opencodeJson.read().once()
     const providerKeys = await storeJson.read((s) => s.providerKeys).once()
@@ -155,11 +155,15 @@ export const configureProviders = sdk.Action.withInput(
         .filter(([, provider]) => isManaged(provider))
         .map(([id, provider]) => {
           const settings = asRecord(provider.settings)
+          const configuredKey = asString(settings.apiKey)
           return {
             id,
             name: asString(provider.name) ?? id,
             baseURL: asString(settings.baseURL) ?? '',
-            apiKey: asString(providerKeys?.[id]) ?? null,
+            apiKey:
+              configuredKey && !/\{(?:env|file):/.test(configuredKey)
+                ? configuredKey
+                : (asString(providerKeys?.[id]) ?? null),
             models: Object.keys(asRecord(provider.models)),
             isDefault: id === defaultProvider,
           }
@@ -169,23 +173,15 @@ export const configureProviders = sdk.Action.withInput(
 
   // execution
   async ({ effects, input }) => {
-    // The keys go to the `startos` volume first: it triggers the restart that gives
-    // the server the new `OPENCODE_KEY_*` variables. `update`, not `merge`, so a key
-    // of a provider the user just removed is not left behind in the environment.
     const providerKeys = Object.fromEntries(
       input.providers
         .filter((provider) => provider.apiKey)
         .map((provider) => [provider.id, provider.apiKey]),
     )
-    await storeJson.update(effects, (current) => ({
-      ...current,
-      providerKeys,
-    }))
-
     const marked = input.providers.find((provider) => provider.isDefault)
     let shownModel: string | undefined
 
-    await opencodeJson.update(effects, (current) => {
+    await opencodeJson.update(effects, async (current) => {
       const config = current ?? {}
       const existing = asRecord(config.providers)
 
@@ -200,6 +196,18 @@ export const configureProviders = sdk.Action.withInput(
       }
 
       for (const provider of input.providers) {
+        if (
+          Object.hasOwn(existing, provider.id) &&
+          !managedIds.has(provider.id)
+        ) {
+          throw new Error(
+            i18n(
+              'Provider ID "${id}" belongs to a provider configured outside this action. Choose another ID.',
+              { id: provider.id },
+            ),
+          )
+        }
+
         const previous = asRecord(existing[provider.id])
         const settings = asRecord(previous.settings)
         const previousModels = asRecord(previous.models)
@@ -247,6 +255,11 @@ export const configureProviders = sdk.Action.withInput(
         model = undefined
         shownModel = undefined
       }
+
+      await storeJson.update(effects, (current) => ({
+        ...current,
+        providerKeys,
+      }))
 
       return {
         ...config,

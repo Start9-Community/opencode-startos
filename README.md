@@ -79,7 +79,7 @@ The package owns two file models.
 | File                                  | Format | Keys                            | Seeded by                                | Rewritten by                 |
 | ------------------------------------- | ------ | ------------------------------- | ---------------------------------------- | ---------------------------- |
 | `startos/store.json`                  | JSON   | `adminPassword`, `providerKeys` | the **Set Admin Password** action        | the two actions, on each run |
-| `main/.config/opencode/opencode.json` | JSON   | `$schema`, `providers`, `model` | the **Configure Model Providers** action | the same action, on each run |
+| `main/.config/opencode/opencode.json` | JSONC  | `$schema`, `providers`, `model` | the **Configure Model Providers** action | the same action, on each run |
 
 `adminPassword` is stored in clear text because the server reads it verbatim
 from `OPENCODE_PASSWORD` and cannot be given a hash. There is no default: it is
@@ -100,6 +100,8 @@ normalize or repair it. A hand edit therefore survives:
 `opencode.json` is OpenCode's own global configuration, at the path OpenCode
 reads it from. The package models it so the Configure Model Providers action can
 write provider entries; it is not generated, replaced, or seeded otherwise.
+Comments and trailing commas are accepted, but saving reserializes the file as
+JSON without its comments or formatting.
 
 ## Dependencies
 
@@ -164,20 +166,22 @@ warning, and status gating; what follows is what the metadata cannot express.
   **Settings → Providers**.
 - **What it changes.** For each provider in the form, an entry in the `providers`
   map of `main/.config/opencode/opencode.json`, and its API key under
-  `providerKeys` in `startos/store.json`. Only the entries this action wrote (the
-  ones carrying `package: @opencode/ai/providers/openai-compatible`) are rebuilt;
-  every other entry in the file, and a `model` that names none of them, is left as
-  it was. The `model` key is set when a provider's **Default** toggle is on, or
-  dropped when it names a provider this save removes. A new or changed API key
+  `providerKeys` in `startos/store.json`. Entries carrying
+  `package: @opencode/ai/providers/openai-compatible` are rebuilt; an ID collision
+  with any other entry is rejected before either file changes. Every other entry,
+  and a `model` that names none of the managed entries, is left as it was. The
+  `model` key is set when a provider's **Default** toggle is on, or dropped when it
+  names a provider this save removes. A new or changed API key
   restarts the service, because the server receives it as an `OPENCODE_KEY_<ID>`
   environment variable; a change that touches no key is picked up by the running
   server without a restart.
 - **Cost.** Seconds. Nothing outside the two files above is touched, and no
   session, repository, or project is affected.
-- **Repeat safety.** The form is prefilled with the providers this action wrote and
-  is the authority for them: saving it unchanged changes nothing, leaving one out
-  disconnects it, and an empty form disconnects them all. Providers added elsewhere
-  — in the web app, or by hand — are not listed and are not touched.
+- **Repeat safety.** The form is prefilled with the OpenAI-compatible entries and
+  is the authority for them: leaving one out disconnects it, and an empty form
+  disconnects them all. A literal API key on an existing entry is prefilled and
+  moved into `providerKeys` on save. Providers using another package are not
+  listed and are not touched.
 - **Outputs.** Each provider with the model IDs it serves, and the default model
   when one is set.
 
@@ -192,10 +196,8 @@ One task, raised by `startos/init/watchCredentials.ts`.
 Because it is `critical`, it blocks the service from starting and suspends the
 ordinary controls until it is satisfied — this is what the user sees first, and
 why nothing is reachable before a password exists. It is idempotent on its replay
-key, so ordinary rebuilds do not re-raise it. It returns only if the stored
-password is lost — most plausibly a restore that brought back `main` without the
-`startos` volume, in which case a new password must be set (and existing sessions
-are invalidated).
+key, so ordinary rebuilds do not re-raise it. It returns only if `store.json`
+loses the password, and running the action again clears it.
 
 ## Health Checks
 
@@ -239,16 +241,11 @@ required.
 2. **The `opencode pair` pairing-link flow is not wired up.** Sign in with the
    password from the **Set Admin Password** action instead of a one-time pairing
    link or QR code.
-3. **The Configure Model Providers action covers OpenAI-compatible endpoints the
-   catalog cannot reach.** Hosted providers — OpenRouter, Anthropic, OpenAI, and
-   the rest — connect in the web app itself, under **Settings → Providers**. The
-   action adds an endpoint the catalog has no entry for, such as your own vLLM,
-   LM Studio, or Ollama server.
-4. **OpenCode's self-updater is disabled** in the container. The server is updated
+3. **OpenCode's self-updater is disabled** in the container. The server is updated
    by updating the StartOS package, not from inside the app.
-5. **The container runs as `root`.** The upstream image does, and the package does
+4. **The container runs as `root`.** The upstream image does, and the package does
    not change its user.
-6. **The service opens its own outbound connections** — to model providers and to
+5. **The service opens its own outbound connections** — to model providers and to
    git repositories it clones or fetches. Those are made from the server's
    outbound route, independently of whichever address the web interface is
    published on.

@@ -1,18 +1,31 @@
 import { FileHelper, z } from '@start9labs/start-sdk'
+import { parse, type ParseError } from 'jsonc-parser'
+import { i18n } from '../i18n'
 import { sdk } from '../sdk'
 
-// OpenCode's global configuration. The Configure Model Providers action adds
-// providers here; `providers` and `model` stay unvalidated because the action owns
-// `providers`, and `model` is a string or the object OpenCode resolves it to.
 const shape = z.looseObject({
   $schema: z.string().optional().catch(undefined),
   model: z.unknown().optional().catch(undefined),
   providers: z.record(z.string(), z.unknown()).optional().catch(undefined),
 })
 
-export const opencodeJson = FileHelper.json(
+// OpenCode accepts comments and trailing commas in `opencode.json`.
+export const opencodeJson = FileHelper.raw(
   { base: sdk.volumes.main, subpath: '.config/opencode/opencode.json' },
-  shape,
+  (config: OpencodeConfig) => JSON.stringify(config, null, 2),
+  (text) => {
+    const errors: ParseError[] = []
+    const config: unknown = parse(text, errors, { allowTrailingComma: true })
+    if (errors.length) {
+      throw new Error(
+        i18n(
+          'The OpenCode configuration contains invalid JSONC. Fix opencode.json before configuring providers.',
+        ),
+      )
+    }
+    return config
+  },
+  (config) => shape.parse(config),
 )
 
 export type OpencodeProvider = {

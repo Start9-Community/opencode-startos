@@ -44,6 +44,8 @@ const dict = {
   'Model Providers': 31,
   'Saved. These providers are available in OpenCode, and new sessions start on the default model if one is set.': 32,
   'Default Model': 33,
+  'Provider ID "${id}" belongs to a provider configured outside this action. Choose another ID.': 34,
+  'The OpenCode configuration contains invalid JSONC. Fix opencode.json before configuring providers.': 35,
 } as const
 
 /**
