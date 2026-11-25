@@ -52,10 +52,10 @@ One subcontainer, `opencode-sub`, runs the server. The image's entrypoint is the
 
 The package declares two volumes.
 
-| Volume    | Mount point                                  | Contents                                                                                                                 |
-| --------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `main`    | `/root` (read-write)                         | The container's entire home: sessions, credentials, repositories, projects, and OpenCode's own config, state, and cache. |
-| `startos` | optional read-only `provider-trust/` subtree | StartOS-side state: `store.json`, holding the generated login password and the configured providers' API keys.           |
+| Volume    | Mount point                                                                  | Contents                                                                                                                                                 |
+| --------- | ---------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `main`    | `/root` (read-write)                                                         | The container's entire home: sessions, credentials, repositories, projects, and OpenCode's own config, state, and cache.                                 |
+| `startos` | `/etc/opencode-trust` (read-only, `provider-trust/` only, while a CA is set) | StartOS-side state: `store.json`, holding the generated login password and the configured providers' API keys, and the optional `provider-trust/ca.pem`. |
 
 `main` is mounted over the image's home directory, so everything OpenCode writes
 under `/root` persists across restarts and updates:
@@ -283,20 +283,23 @@ architectures: [x86_64, aarch64]
 subcontainers: [opencode-sub]
 volumes:
   main: /root
-  startos: unmounted
+  startos: /etc/opencode-trust # provider-trust/ only, read-only, while a CA is set
 file_models:
   - startos/store.json
   - main/.config/opencode/opencode.json
+  - startos/provider-trust/ca.pem
 startos_managed_env_vars:
   - OPENCODE_PASSWORD
   - OPENCODE_DISABLE_AUTOUPDATE
   - OPENCODE_KEY_<PROVIDER_ID>
+  - NODE_EXTRA_CA_CERTS
 dependencies: none
 interfaces:
   ui: { type: ui, port: 4096 }
 actions:
   - set-admin-password
   - configure-providers
+  - configure-provider-ca
 tasks:
   - { action: set-admin-password, severity: critical }
 health_checks:
