@@ -55,7 +55,7 @@ The package declares two volumes.
 | Volume    | Mount point          | Contents                                                                                                                 |
 | --------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------ |
 | `main`    | `/root` (read-write) | The container's entire home: sessions, credentials, repositories, projects, and OpenCode's own config, state, and cache. |
-| `startos` | not mounted          | StartOS-side state: `store.json`, holding the generated login password.                                                  |
+| `startos` | not mounted          | StartOS-side state: `store.json`, holding the generated login password and the configured providers' API keys.           |
 
 `main` is mounted over the image's home directory, so everything OpenCode writes
 under `/root` persists across restarts and updates:
@@ -68,31 +68,40 @@ under `/root` persists across restarts and updates:
 lost on restart; treat anything only in there as scratch.
 
 The `startos` volume is deliberately not mounted into `opencode-sub`, so the
-running server never sees the password file — it receives the password through
-the `OPENCODE_PASSWORD` environment variable instead.
+running server never sees the file itself — it receives the login password as
+`OPENCODE_PASSWORD` and each configured provider's API key as an
+`OPENCODE_KEY_<ID>` variable instead.
 
 ## File Models
 
-The package owns exactly one file model: `store.json` on the `startos` volume.
+The package owns two file models.
 
-| File                 | Format | Key             | Seeded by                         | Rewritten by                 |
-| -------------------- | ------ | --------------- | --------------------------------- | ---------------------------- |
-| `startos/store.json` | JSON   | `adminPassword` | the **Set Admin Password** action | the same action, on each run |
+| File                                  | Format | Keys                            | Seeded by                                | Rewritten by                 |
+| ------------------------------------- | ------ | ------------------------------- | ---------------------------------------- | ---------------------------- |
+| `startos/store.json`                  | JSON   | `adminPassword`, `providerKeys` | the **Set Admin Password** action        | the two actions, on each run |
+| `main/.config/opencode/opencode.json` | JSONC  | `$schema`, `providers`, `model` | the **Configure Model Providers** action | the same action, on each run |
 
 `adminPassword` is stored in clear text because the server reads it verbatim
 from `OPENCODE_PASSWORD` and cannot be given a hash. There is no default: it is
 absent until the user runs the action, which is what the [task](#tasks) waits
-for.
+for. `providerKeys` maps a configured provider's id to its API key, and has no
+default either.
 
-The schema is permissive (`z.looseObject`, every key optional), so the file is
-never rewritten by the package on its own — only the action writes it, and it
-only ever merges the one key. A hand edit to `adminPassword` therefore survives:
-the running server watches the file and restarts with the new value. Nothing
-else re-asserts or normalizes the file.
+Both schemas are permissive (`z.looseObject`, every key optional), and the
+package writes each file only from an action — never at startup, and never to
+normalize or repair it. A hand edit therefore survives:
 
-OpenCode's **own** configuration file (`~/.config/opencode/opencode.json`, or
-`opencode.jsonc`, on the `main` volume) is not modeled by this package. OpenCode
-writes and reads it, and the package neither seeds nor rewrites it.
+- In `store.json`, the running server watches the file and restarts with the new
+  value.
+- In `opencode.json`, OpenCode watches the file and reloads it without a restart.
+  The package leaves every key it does not own — including whatever OpenCode
+  writes there itself — as it found it.
+
+`opencode.json` is OpenCode's own global configuration, at the path OpenCode
+reads it from. The package models it so the Configure Model Providers action can
+write provider entries; it is not generated, replaced, or seeded otherwise.
+Comments and trailing commas are accepted, but saving reserializes the file as
+JSON without its comments or formatting.
 
 ## Dependencies
 
@@ -124,13 +133,15 @@ complete and nothing to configure on disk.
 3. The user opens the `ui` interface, signs in on the web page with the username
    `opencode` and that password.
 
-The package writes no OpenCode configuration, so provider and model setup is
-upstream's own, in the web app.
+Model providers are not preconfigured. Hosted providers connect in the web app
+itself, under **Settings → Providers**; the **Configure Model Providers** action
+adds an OpenAI-compatible endpoint the web app's own catalog has no entry for. The
+package adds no files OpenCode did not already expect of it.
 
 ## Actions
 
-One user-facing action. The OS carries its id, name, description, warning, and
-status gating; what follows is what the metadata cannot express.
+Two user-facing actions. The OS carries each one's id, name, description,
+warning, and status gating; what follows is what the metadata cannot express.
 
 ### `set-admin-password` — Set Admin Password
 
@@ -146,6 +157,33 @@ status gating; what follows is what the metadata cannot express.
   previous one; it never accumulates.
 - **Outputs.** The username `opencode` (unmasked, copyable) and the new password
   (masked, copyable).
+
+### `configure-providers` — Configure Model Providers
+
+- **When to run it.** When OpenCode should use an OpenAI-compatible endpoint the
+  web app's own catalog has no entry for — a vLLM, LM Studio, or Ollama server on
+  your network. Hosted providers connect in the web app itself, under
+  **Settings → Providers**.
+- **What it changes.** For each provider in the form, an entry in the `providers`
+  map of `main/.config/opencode/opencode.json`, and its API key under
+  `providerKeys` in `startos/store.json`. Entries carrying
+  `package: @opencode/ai/providers/openai-compatible` are rebuilt; an ID collision
+  with any other entry is rejected before either file changes. Every other entry,
+  and a `model` that names none of the managed entries, is left as it was. The
+  `model` key is set when a provider's **Default** toggle is on, or dropped when it
+  names a provider this save removes. A new or changed API key
+  restarts the service, because the server receives it as an `OPENCODE_KEY_<ID>`
+  environment variable; a change that touches no key is picked up by the running
+  server without a restart.
+- **Cost.** Seconds. Nothing outside the two files above is touched, and no
+  session, repository, or project is affected.
+- **Repeat safety.** The form is prefilled with the OpenAI-compatible entries and
+  is the authority for them: leaving one out disconnects it, and an empty form
+  disconnects them all. A literal API key on an existing entry is prefilled and
+  moved into `providerKeys` on save. Providers using another package are not
+  listed and are not touched.
+- **Outputs.** Each provider with the model IDs it serves, and the default model
+  when one is set.
 
 ## Tasks
 
@@ -226,14 +264,17 @@ volumes:
   startos: unmounted
 file_models:
   - startos/store.json
+  - main/.config/opencode/opencode.json
 startos_managed_env_vars:
   - OPENCODE_PASSWORD
   - OPENCODE_DISABLE_AUTOUPDATE
+  - OPENCODE_KEY_<PROVIDER_ID>
 dependencies: none
 interfaces:
   ui: { type: ui, port: 4096 }
 actions:
   - set-admin-password
+  - configure-providers
 tasks:
   - { action: set-admin-password, severity: critical }
 health_checks:

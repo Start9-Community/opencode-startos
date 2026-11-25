@@ -11,8 +11,13 @@ bare clone with no workspace, the full guide is at <https://docs.start9.com/pack
 - **Keep `git`, `bash`, and `openssh-client` in the Dockerfile.** The upstream Alpine
   image ships none of them, and OpenCode's repository and terminal features break
   silently without them.
-- **Deliver the password only through `OPENCODE_PASSWORD`.** Don't write it into
-  OpenCode's own config file; the server reads it from the environment alone.
+- **Deliver the password and provider API keys only through the environment.** OpenCode
+  reads the password from `OPENCODE_PASSWORD` and each provider key from
+  `OPENCODE_KEY_<ID>`; don't write either into a config file.
 - **Keep `main` mounted over the whole of `/root`.** OpenCode spreads its state across
   `~/.local`, `~/.config` and `~/.cache`, and users keep projects under `~`; a narrower
   mount drops data from restarts and backups.
+- **The Configure Model Providers action owns only the providers it writes.** They are
+  the `opencode.json` entries carrying `package: @opencode/ai/providers/openai-compatible`;
+  rebuild those from the form, and leave every other entry — and a `model` that names
+  none of them — as you found it.
