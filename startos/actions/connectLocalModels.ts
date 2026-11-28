@@ -1,3 +1,4 @@
+import { opencodeJson } from '../fileModels/opencode.json'
 import { storeJson } from '../fileModels/store.json'
 import { i18n } from '../i18n'
 import { localBackends } from '../localModels'
@@ -49,6 +50,17 @@ export const connectLocalModels = sdk.Action.withInput(
 
   // execution
   async ({ effects, input }) => {
+    const providers = (await opencodeJson.read((c) => c.providers).once()) ?? {}
+    // OpenCode overlays same-ID providers, retaining their models and settings.
+    const collision = input.backends.find((id) => Object.hasOwn(providers, id))
+    if (collision) {
+      throw new Error(
+        i18n(
+          'Provider ID "${id}" is already configured in opencode.json. Rename or remove it before connecting this local service.',
+          { id: collision },
+        ),
+      )
+    }
     await storeJson.merge(effects, { localBackends: input.backends })
     return {
       version: '1',

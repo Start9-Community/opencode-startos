@@ -60,6 +60,7 @@ const dict = {
   Services: 47,
   'The model services installed on this server. Checking one connects it; unchecking it disconnects it.': 48,
   'Saved. OpenCode restarts, and the connected services’ models appear in its model list once each service is running.': 49,
+  'Provider ID "${id}" is already configured in opencode.json. Rename or remove it before connecting this local service.': 50,
 } as const
 
 /**

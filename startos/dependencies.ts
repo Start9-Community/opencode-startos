@@ -1,5 +1,5 @@
 import { storeJson } from './fileModels/store.json'
-import { bridgeAddress, localBackends } from './localModels'
+import { localBackends } from './localModels'
 import { sdk } from './sdk'
 
 const dependency = (backend: (typeof localBackends)[number]) => {
@@ -16,11 +16,12 @@ const dependency = (backend: (typeof localBackends)[number]) => {
     versionRange,
     kind: 'running',
     healthChecks: ['primary'],
-    // Connected and installed: an uninstalled backend resolves no address.
+    // Installed backends remain dependencies before their API binding exists.
     enabled: async ({ effects }) =>
       (
         (await storeJson.read((s) => s.localBackends).const(effects)) ?? []
-      ).includes(id) && (await bridgeAddress(effects, backend)) !== null,
+      ).includes(id) &&
+      (await sdk.getServiceManifest(effects, id, (m) => m !== null).const()),
   })
 }
 

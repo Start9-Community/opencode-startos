@@ -161,7 +161,11 @@ export async function localProviders(
 ): Promise<Record<string, object>> {
   const providers: Record<string, object> = {}
   for (const b of localBackends) {
-    if (!connected.includes(b.id)) continue
+    if (!connected.includes(b.id)) {
+      // Reconnection must remount after an unwatched uninstall.
+      mountedFor.delete(b.id)
+      continue
+    }
     const address = await bridgeAddress(effects, b)
     const credentials = b.publishesCredentials
       ? await readCredentials(effects, b.id, address)

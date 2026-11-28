@@ -74,6 +74,11 @@ A service has to be running for its models to work. Run **Connect Local
 Models** again and uncheck a service to disconnect it. Your prompts and code
 stay on your server.
 
+If an existing provider uses the id `ollama`, `vllm`, or `llama-cpp`, rename
+or remove it before connecting that local service. For a provider added with
+**Configure Model Providers**, change its **ID** there and save first. A
+provider configured directly in `opencode.json` must be changed there.
+
 ### Connecting a model provider
 
 Hosted providers connect inside the web app, under **Settings → Providers**. The
