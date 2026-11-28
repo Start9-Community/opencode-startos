@@ -50,12 +50,13 @@ One subcontainer, `opencode-sub`, runs the server. The image's entrypoint is the
 
 ## Volume and Data Layout
 
-The package declares two volumes.
+The package declares three volumes.
 
-| Volume    | Mount point                                                                  | Contents                                                                                                                                                 |
-| --------- | ---------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `main`    | `/root` (read-write)                                                         | The container's entire home: sessions, credentials, repositories, projects, and OpenCode's own config, state, and cache.                                 |
-| `startos` | `/etc/opencode-trust` (read-only, `provider-trust/` only, while a CA is set) | StartOS-side state: `store.json`, holding the generated login password and the configured providers' API keys, and the optional `provider-trust/ca.pem`. |
+| Volume    | Mount point                                                                  | Contents                                                                                                                                                                                     |
+| --------- | ---------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `main`    | `/root` (read-write)                                                         | The container's entire home: sessions, credentials, repositories, projects, and OpenCode's own config, state, and cache.                                                                     |
+| `startos` | `/etc/opencode-trust` (read-only, `provider-trust/` only, while a CA is set) | StartOS-side state: `store.json`, holding the generated login password, the configured providers' API keys and the connected local-model services, and the optional `provider-trust/ca.pem`. |
+| `mounts`  | not mounted                                                                  | The read-only `public` volumes of connected vLLM and llama.cpp services, where the package reads each one's API key and served model. Not backed up.                                         |
 
 `main` is mounted over the image's home directory, so everything OpenCode writes
 under `/root` persists across restarts and updates:
@@ -76,17 +77,18 @@ server cannot read `store.json` — it receives the login password as
 
 The package owns three file models.
 
-| File                                  | Format | Keys                            | Seeded by                                | Rewritten by                 |
-| ------------------------------------- | ------ | ------------------------------- | ---------------------------------------- | ---------------------------- |
-| `startos/store.json`                  | JSON   | `adminPassword`, `providerKeys` | the **Set Admin Password** action        | the two actions, on each run |
-| `main/.config/opencode/opencode.json` | JSONC  | `$schema`, `providers`, `model` | the **Configure Model Providers** action | the same action, on each run |
-| `startos/provider-trust/ca.pem`       | PEM    | —                               | the **Configure Provider CA** action     | the same action, on each run |
+| File                                  | Format | Keys                                             | Seeded by                                | Rewritten by                   |
+| ------------------------------------- | ------ | ------------------------------------------------ | ---------------------------------------- | ------------------------------ |
+| `startos/store.json`                  | JSON   | `adminPassword`, `providerKeys`, `localBackends` | the **Set Admin Password** action        | the three actions, on each run |
+| `main/.config/opencode/opencode.json` | JSONC  | `$schema`, `providers`, `model`                  | the **Configure Model Providers** action | the same action, on each run   |
+| `startos/provider-trust/ca.pem`       | PEM    | —                                                | the **Configure Provider CA** action     | the same action, on each run   |
 
 `adminPassword` is stored in clear text because the server reads it verbatim
 from `OPENCODE_PASSWORD` and cannot be given a hash. There is no default: it is
 absent until the user runs the action, which is what the [task](#tasks) waits
 for. `providerKeys` maps a configured provider's id to its API key, and has no
-default either. The PEM file is optional and holds one public CA certificate.
+default either. `localBackends` lists the package ids Connect Local Models
+connected. The PEM file is optional and holds one public CA certificate.
 
 Both JSON schemas are permissive (`z.looseObject`, every key optional), and the
 package writes each file only from an action — never at startup, and never to
@@ -106,8 +108,32 @@ JSON without its comments or formatting.
 
 ## Dependencies
 
-None. The package declares no service dependencies and mounts no dependency
-volumes. OpenCode reaches model providers and git remotes over its own outbound
+Three optional dependencies, each enabled while **Connect Local Models** has it
+connected and it is installed; uninstalling one disables it. All three must be running with their `primary` health check
+passing.
+
+| Dependency  | Reached at                                    | Read from its `public` volume | OpenCode provider id |
+| ----------- | --------------------------------------------- | ----------------------------- | -------------------- |
+| `ollama`    | its API binding's bridge address              | nothing                       | `ollama`             |
+| `vllm`      | its API binding's bridge address              | `apiKey` and the served model | `vllm`               |
+| `llama-cpp` | its Bearer-gated API binding's bridge address | `apiKey`                      | `llama-cpp`          |
+
+The package hands each connected service to OpenCode as a provider in
+`OPENCODE_CONFIG_CONTENT`, a config layer OpenCode merges over
+`opencode.json`; nothing is written to the file. A service that is installed
+but not yet resolvable — not running its API binding, or vLLM with no model
+selected — is left out until it is, and OpenCode restarts when it appears.
+
+- **Ollama** uses OpenCode's built-in Ollama provider, which lists the pulled
+  models itself every 30 seconds and reads each one's tool and vision support
+  from Ollama.
+- **vLLM** is one model: the one vLLM publishes as served. Switching it in
+  vLLM's **Set Model** restarts OpenCode onto the new one. Tool calling is on,
+  as every vLLM preset serves with a tool-call parser.
+- **llama.cpp** is one model, `llama-cpp/current`, labelled `llama.cpp`:
+  llama-server answers it with whatever model its **Set Model** chose.
+
+OpenCode reaches hosted model providers and git remotes over its own outbound
 network connection.
 
 ## Network Access and Interfaces
@@ -136,12 +162,13 @@ complete and nothing to configure on disk.
 
 Model providers are not preconfigured. Hosted providers connect in the web app
 itself, under **Settings → Providers**; the **Configure Model Providers** action
-adds an OpenAI-compatible endpoint the web app's own catalog has no entry for. The
-package adds no files OpenCode did not already expect of it.
+adds an OpenAI-compatible endpoint the web app's own catalog has no entry for,
+and **Connect Local Models** connects the Ollama, vLLM or llama.cpp service on
+the same server. The package adds no files OpenCode did not already expect of it.
 
 ## Actions
 
-Two user-facing actions. The OS carries each one's id, name, description,
+Four user-facing actions. The OS carries each one's id, name, description,
 warning, and status gating; what follows is what the metadata cannot express.
 
 ### `set-admin-password` — Set Admin Password
@@ -207,6 +234,21 @@ warning, and status gating; what follows is what the metadata cannot express.
   certificate, so saving unchanged keeps it. One CA at a time.
 - **Outputs.** None.
 
+### `connect-local-models` — Connect Local Models
+
+- **When to run it.** After installing Ollama, vLLM or llama.cpp on the same
+  server, to use its models in OpenCode; again to disconnect one.
+- **What it changes.** `localBackends` in `startos/store.json`, which enables
+  the matching optional dependency and restarts OpenCode with the service as a
+  provider. Nothing in `opencode.json` is touched.
+- **Cost.** Seconds, and OpenCode restarts.
+- **Repeat safety.** Repeatable. The form lists only the services installed now,
+  prefilled with the connected ones; the saved list replaces the previous one.
+- **Outputs.** None.
+
+The provider ids `ollama`, `vllm` and `llama-cpp` are reserved for these
+services, so **Configure Model Providers** refuses them.
+
 ## Tasks
 
 One task, raised by `startos/init/watchCredentials.ts`.
@@ -244,16 +286,18 @@ backup and restarts it afterward, so the SQLite database (including its `-wal`
 and `-shm` files) is captured quiesced; no logical dump is involved. A restore
 therefore reconstructs each volume by its files, not by replaying anything.
 
-Both volumes are captured and nothing is excluded:
+`main` and `startos` are captured whole; `mounts` is excluded, since it only
+holds connected services' `public` volumes, mounted afresh at every start:
 
 - `main` restores every session, provider credential, cloned repository, project,
   and OpenCode setting.
-- `startos` restores the generated login password, so a restored instance is
-  usable with the password in use at backup time.
+- `startos` restores the generated login password, the connected local-model
+  services, and the provider CA, so a restored instance is usable with the
+  password in use at backup time.
 
-Because both are taken together, a restore is self-contained: no dependency needs
-to be present first, no credential has to be re-entered, and no resync is
-required.
+No credential has to be re-entered and no resync is required. A connected
+local-model service is used again once it is installed and running; until then
+its models are absent.
 
 ## Limitations and Differences
 
@@ -267,7 +311,10 @@ required.
    by updating the StartOS package, not from inside the app.
 4. **The container runs as `root`.** The upstream image does, and the package does
    not change its user.
-5. **The service opens its own outbound connections** — to model providers and to
+5. **A custom vLLM model needs tool calling enabled.** OpenCode calls vLLM's
+   model with tools on; a model served without `--enable-auto-tool-choice` and a
+   `--tool-call-parser` rejects those requests. vLLM's presets all set both.
+6. **The service opens its own outbound connections** — to model providers and to
    git repositories it clones or fetches. Those are made from the server's
    outbound route, independently of whichever address the web interface is
    published on.
@@ -284,6 +331,7 @@ subcontainers: [opencode-sub]
 volumes:
   main: /root
   startos: /etc/opencode-trust # provider-trust/ only, read-only, while a CA is set
+  mounts: unmounted
 file_models:
   - startos/store.json
   - main/.config/opencode/opencode.json
@@ -293,13 +341,15 @@ startos_managed_env_vars:
   - OPENCODE_DISABLE_AUTOUPDATE
   - OPENCODE_KEY_<PROVIDER_ID>
   - NODE_EXTRA_CA_CERTS
-dependencies: none
+  - OPENCODE_CONFIG_CONTENT
+dependencies: [ollama, vllm, llama-cpp] # all optional
 interfaces:
   ui: { type: ui, port: 4096 }
 actions:
   - set-admin-password
   - configure-providers
   - configure-provider-ca
+  - connect-local-models
 tasks:
   - { action: set-admin-password, severity: critical }
 health_checks:

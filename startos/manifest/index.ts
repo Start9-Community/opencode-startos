@@ -12,7 +12,8 @@ export const manifest = setupManifest({
   description: { short, long },
   // `startos` holds secrets (the login password and provider API keys) and the
   // optional public CA; only the CA subtree is mounted into the container, read-only.
-  volumes: ['main', 'startos'],
+  // `mounts` holds local-model backends' public volumes and is never backed up.
+  volumes: ['main', 'startos', 'mounts'],
   images: {
     opencode: {
       source: { dockerBuild: {} },

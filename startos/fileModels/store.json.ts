@@ -6,6 +6,8 @@ const shape = z.looseObject({
   // API keys for the providers the Configure Model Providers action writes, keyed
   // by provider id; `main.ts` passes each to the server as `OPENCODE_KEY_<ID>`.
   providerKeys: z.record(z.string(), z.unknown()).optional().catch(undefined),
+  // The local-model backends Connect Local Models connected, by package id.
+  localBackends: z.array(z.string()).optional().catch(undefined),
 })
 
 export const storeJson = FileHelper.json(

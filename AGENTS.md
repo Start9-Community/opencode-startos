@@ -21,3 +21,8 @@ bare clone with no workspace, the full guide is at <https://docs.start9.com/pack
   the `opencode.json` entries carrying `package: @opencode/ai/providers/openai-compatible`;
   rebuild those from the form, and leave every other entry — and a `model` that names
   none of them — as you found it.
+- **Hand local-model backends to OpenCode only through `OPENCODE_CONFIG_CONTENT`.**
+  `startos/localModels.ts` rebuilds them from live bridge addresses on every start;
+  written into `opencode.json` they would outlive an uninstall or a port change.
+  Keep the Ollama entry's id `ollama`: OpenCode's built-in Ollama provider is what
+  discovers its models.

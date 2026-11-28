@@ -6,6 +6,7 @@ import {
 } from './fileModels/providerCa'
 import { storeJson } from './fileModels/store.json'
 import { i18n } from './i18n'
+import { localProviders } from './localModels'
 import { sdk } from './sdk'
 import { providerKeyEnvVar, uiPort } from './utils'
 
@@ -28,6 +29,11 @@ export const main = sdk.setupMain(async ({ effects }) => {
         (entry): entry is [string, string] => typeof entry[1] === 'string',
       )
       .map(([id, key]) => [providerKeyEnvVar(id), key]),
+  )
+
+  const providers = await localProviders(
+    effects,
+    (await storeJson.read((s) => s.localBackends).const(effects)) ?? [],
   )
 
   let mounts = sdk.Mounts.of().mountVolume({
@@ -67,6 +73,9 @@ export const main = sdk.setupMain(async ({ effects }) => {
         OPENCODE_DISABLE_AUTOUPDATE: '1',
         ...(extraCaPath && { NODE_EXTRA_CA_CERTS: extraCaPath }),
         ...providerEnv,
+        ...(Object.keys(providers).length > 0 && {
+          OPENCODE_CONFIG_CONTENT: JSON.stringify({ providers }),
+        }),
       },
     },
     ready: {

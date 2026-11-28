@@ -1,6 +1,7 @@
 import { opencodeJson } from '../fileModels/opencode.json'
 import { storeJson } from '../fileModels/store.json'
 import { i18n } from '../i18n'
+import { localBackendIds } from '../localModels'
 import { sdk } from '../sdk'
 import { openAiCompatiblePackage, providerKeyEnvVar } from '../utils'
 
@@ -40,7 +41,7 @@ const providerShape = InputSpec.of({
   id: Value.text({
     name: i18n('ID'),
     description: i18n(
-      'A short identifier for this provider, used to select it. Lowercase letters, digits, and dashes, for example `vllm`.',
+      'A short identifier for this provider, used to select it. Lowercase letters, digits, and dashes, for example `lab`.',
     ),
     required: true,
     default: null,
@@ -189,6 +190,15 @@ export const configureProviders = sdk.Action.withInput(
   async ({ effects, input }) => {
     if (input.providers.filter((provider) => provider.isDefault).length > 1) {
       throw new Error(i18n('Select only one default provider.'))
+    }
+    const reserved = input.providers.find((p) => localBackendIds.includes(p.id))
+    if (reserved) {
+      throw new Error(
+        i18n(
+          'Provider ID "${id}" is reserved for the Connect Local Models action. Choose another ID.',
+          { id: reserved.id },
+        ),
+      )
     }
     const providerKeys = Object.fromEntries(
       input.providers

@@ -27,7 +27,7 @@ const dict = {
   Providers: 14,
   'One entry per endpoint. Remove an entry to disconnect that provider.': 15,
   ID: 16,
-  'A short identifier for this provider, used to select it. Lowercase letters, digits, and dashes, for example `vllm`.': 17,
+  'A short identifier for this provider, used to select it. Lowercase letters, digits, and dashes, for example `lab`.': 17,
   'Lowercase letters, digits, and dashes, starting with a letter or digit': 18,
   Name: 19,
   'How the provider is named in the OpenCode model list, for example `Lab vLLM`.': 20,
@@ -54,6 +54,12 @@ const dict = {
   'Select only one default provider.': 41,
   'Paste one public PEM CA certificate.': 42,
   'This certificate is not a CA.': 43,
+  'Provider ID "${id}" is reserved for the Connect Local Models action. Choose another ID.': 44,
+  'Connect Local Models': 45,
+  'Connect OpenCode to the Ollama, vLLM, or llama.cpp service on this server, so their models appear in OpenCode.': 46,
+  Services: 47,
+  'The model services installed on this server. Checking one connects it; unchecking it disconnects it.': 48,
+  'Saved. OpenCode restarts, and the connected services’ models appear in its model list once each service is running.': 49,
 } as const
 
 /**
