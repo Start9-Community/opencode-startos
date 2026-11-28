@@ -32,9 +32,11 @@ StartOS server. You use it from a browser:
 4. Choose a model. Out of the box OpenCode uses a free model hosted by OpenCode,
    so your prompts and code are sent to OpenCode's servers. To use a hosted
    provider instead, open **Settings → Providers** in the web app and connect it
-   (an API key, or your OpenCode Console account). For an OpenAI-compatible
-   endpoint the app's catalog cannot reach — your own vLLM, LM Studio, or Ollama
-   server — run the **Configure Model Providers** action from StartOS; see
+   (an API key, or your OpenCode Console account). To keep everything on your
+   server, install Ollama, vLLM, or llama.cpp from the Start9 registry and run
+   **Connect Local Models** — see
+   [Using models on this server](#using-models-on-this-server). For any other
+   OpenAI-compatible endpoint, run **Configure Model Providers**; see
    [Connecting a model provider](#connecting-a-model-provider).
 5. Back on the home screen, click **Add project** and choose a folder to work in.
    Pick a folder inside your home directory (`~/…`, shown as `root` when you
@@ -55,15 +57,38 @@ open past sessions, and change settings from the sidebar. The same address also
 serves the HTTP API under `/api/*`, if you want to drive the server from your own
 scripts.
 
+### Using models on this server
+
+Install **Ollama**, **vLLM**, or **llama.cpp** on this server and give it a
+model the way its own instructions describe. Then run **Connect Local Models**
+in OpenCode, check the services to connect, and save. OpenCode restarts, and
+their models appear in its model list:
+
+- **Ollama** — every model you have pulled, kept up to date as you pull more.
+- **vLLM** — the model vLLM is serving. Change it with vLLM's **Set Model**, and
+  OpenCode follows.
+- **llama.cpp** — one entry, **llama.cpp**, which uses whatever model
+  llama.cpp's **Set Model** chose.
+
+A service has to be running for its models to work. Run **Connect Local
+Models** again and uncheck a service to disconnect it. Your prompts and code
+stay on your server.
+
+If an existing provider uses the id `ollama`, `vllm`, or `llama-cpp`, rename
+or remove it before connecting that local service. For a provider added with
+**Configure Model Providers**, change its **ID** there and save first. A
+provider configured directly in `opencode.json` must be changed there.
+
 ### Connecting a model provider
 
 Hosted providers connect inside the web app, under **Settings → Providers**. The
 **Configure Model Providers** action is for an OpenAI-compatible endpoint the
-app's catalog has no entry for — a vLLM, LM Studio, or Ollama server on your
-network. Run it from StartOS; each entry asks for:
+app's catalog has no entry for — a vLLM, LM Studio, or Ollama server elsewhere
+on your network. Run it from StartOS; each entry asks for:
 
-- **ID** — a short name used to identify the provider (`vllm`). Lowercase
-  letters, digits, and dashes.
+- **ID** — a short name used to identify the provider (`lab`). Lowercase
+  letters, digits, and dashes. `ollama`, `vllm`, and `llama-cpp` are reserved
+  for **Connect Local Models**.
 - **Name** — how the provider appears in OpenCode's model list (`Lab vLLM`).
 - **Base URL** — the endpoint's API root, including `/v1`, for example
   `http://192.168.1.50:8000/v1`.
