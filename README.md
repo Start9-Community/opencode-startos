@@ -109,8 +109,10 @@ JSON without its comments or formatting.
 ## Dependencies
 
 Three optional dependencies, each enabled while **Connect Local Models** has it
-connected and it is installed; uninstalling one disables it. All three must be running with their `primary` health check
-passing.
+connected and it is installed; uninstalling one disables it. Each connected
+service must meet its version requirement and be running with its `primary`
+health check passing. An installed service with no API binding still appears
+as a dependency, so an older release surfaces an update requirement.
 
 | Dependency  | Reached at                                    | Read from its `public` volume | OpenCode provider id |
 | ----------- | --------------------------------------------- | ----------------------------- | -------------------- |
@@ -244,6 +246,9 @@ warning, and status gating; what follows is what the metadata cannot express.
 - **Cost.** Seconds, and OpenCode restarts.
 - **Repeat safety.** Repeatable. The form lists only the services installed now,
   prefilled with the connected ones; the saved list replaces the previous one.
+  A selected service whose provider id already exists in `opencode.json` is
+  rejected without saving. Rename or remove that provider first; OpenCode
+  overlays same-id providers rather than replacing their models and settings.
 - **Outputs.** None.
 
 The provider ids `ollama`, `vllm` and `llama-cpp` are reserved for these

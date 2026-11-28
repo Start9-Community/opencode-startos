@@ -52,6 +52,7 @@ export default {
     47: 'Servicios',
     48: 'Los servicios de modelos instalados en este servidor. Marca uno para conectarlo; desmárcalo para desconectarlo.',
     49: 'Guardado. OpenCode se reinicia y los modelos de los servicios conectados aparecen en su lista de modelos cuando cada servicio está en ejecución.',
+    50: 'El ID de proveedor "${id}" ya está configurado en opencode.json. Cámbiale el nombre o elimínalo antes de conectar este servicio local.',
   },
   de_DE: {
     0: 'Weboberfläche',
@@ -104,6 +105,7 @@ export default {
     47: 'Dienste',
     48: 'Die auf diesem Server installierten Modelldienste. Anhaken verbindet einen Dienst, Abhaken trennt ihn.',
     49: 'Gespeichert. OpenCode startet neu, und die Modelle der verbundenen Dienste erscheinen in seiner Modellliste, sobald der jeweilige Dienst läuft.',
+    50: 'Die Anbieter-ID „${id}“ ist bereits in opencode.json konfiguriert. Benennen Sie sie um oder entfernen Sie sie, bevor Sie diesen lokalen Dienst verbinden.',
   },
   pl_PL: {
     0: 'Interfejs webowy',
@@ -156,6 +158,7 @@ export default {
     47: 'Usługi',
     48: 'Usługi modeli zainstalowane na tym serwerze. Zaznacz, aby połączyć; odznacz, aby rozłączyć.',
     49: 'Zapisano. OpenCode uruchamia się ponownie, a modele połączonych usług pojawiają się na jego liście modeli, gdy dana usługa działa.',
+    50: 'Identyfikator dostawcy „${id}” jest już skonfigurowany w opencode.json. Zmień go lub usuń przed połączeniem tej lokalnej usługi.',
   },
   fr_FR: {
     0: 'Interface web',
@@ -208,5 +211,6 @@ export default {
     47: 'Services',
     48: 'Les services de modèles installés sur ce serveur. Cochez-en un pour le connecter, décochez-le pour le déconnecter.',
     49: 'Enregistré. OpenCode redémarre, et les modèles des services connectés apparaissent dans sa liste dès que chaque service est en cours d’exécution.',
+    50: 'L’identifiant de fournisseur « ${id} » est déjà configuré dans opencode.json. Renommez-le ou supprimez-le avant de connecter ce service local.',
   },
 } satisfies Record<string, LangDict>
